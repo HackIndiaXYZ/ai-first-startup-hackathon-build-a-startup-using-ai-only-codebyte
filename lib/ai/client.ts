@@ -23,7 +23,8 @@ import { PRESET_IDEAS, generateDynamicPlan } from "./presets";
 // FIX 2: Extracted named constants for modern AI model versions
 // Note: Verify against Google Gemini and Anthropic documentation for active model identifiers.
 export const GEMINI_MODEL = "gemini-2.5-flash";
-export const CLAUDE_MODEL = "claude-3-5-sonnet-latest";
+// FIX A: Updated to current-generation Anthropic Claude Sonnet model
+export const CLAUDE_MODEL = "claude-sonnet-5";
 
 export interface AgentExecutionResult<T> {
   data: T;

@@ -70,8 +70,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (stage === "spec") {
-      const strategy = previousData?.strategy;
-      const copywriter = previousData?.copywriter;
+      // FIX B: Defensive reconstruction if strategy or copywriter is missing from previousData
+      const strategy =
+        previousData?.strategy ||
+        (await runStrategyAgent(cleanIdea, (await runResearchAgent(cleanIdea)).data)).data;
+      const copywriter =
+        previousData?.copywriter || (await runCopywriterAgent(cleanIdea, strategy)).data;
       const res = await runSpecAgent(cleanIdea, strategy, copywriter);
       return NextResponse.json({
         success: true,

@@ -49,7 +49,7 @@ export const DeckSlideSchema = z.object({
   bullets: z.array(z.string()).default([]),
   takeaway: z.string(),
   metrics: z.array(z.object({ label: z.string(), value: z.string() })).optional(),
-  visualType: z.enum(["bullets", "stats", "split", "timeline"]).optional(),
+  visualType: z.enum(["bullets", "stats", "split", "timeline"]).catch("bullets").optional(),
 });
 
 export const ValuePropSchema = z.object({
