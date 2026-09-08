@@ -86,10 +86,13 @@ export interface SpecOutput {
   };
 }
 
+export type PlanSource = "live" | "preset" | "fallback";
+
 export interface StartupPlan {
   idea: string;
   createdAt: string;
   durationSeconds: number;
+  source?: PlanSource;
   research: ResearchOutput;
   strategy: StrategyOutput;
   copywriter: CopywriterOutput;

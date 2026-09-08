@@ -1,0 +1,20 @@
+import { MetadataRoute } from "next";
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: "PitchPilot — AI Co-founder for Solo Founders",
+    short_name: "PitchPilot",
+    description: "Autonomous 4-agent startup generator for solo founders",
+    start_url: "/",
+    display: "standalone",
+    background_color: "#0a0a0a",
+    theme_color: "#0a0a0a",
+    icons: [
+      {
+        src: "/icon.svg",
+        sizes: "any",
+        type: "image/svg+xml",
+      },
+    ],
+  };
+}

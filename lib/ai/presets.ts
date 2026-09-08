@@ -1237,3 +1237,18 @@ export function generateDynamicPlan(userIdea: string): StartupPlan {
     }
   };
 }
+
+// FIX 6: Lightweight chips export to prevent shipping entire preset plans to the client bundle
+export interface PresetChip {
+  id: string;
+  badge: string;
+  title: string;
+  description: string;
+}
+
+export const PRESET_CHIPS: PresetChip[] = PRESET_IDEAS.map((p) => ({
+  id: p.id,
+  badge: p.badge,
+  title: p.title,
+  description: p.description,
+}));

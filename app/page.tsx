@@ -7,8 +7,8 @@ import { IdeaInput } from "@/components/IdeaInput";
 import { AgentPipeline } from "@/components/AgentPipeline";
 import { Dashboard } from "@/components/Dashboard";
 import { HowItWasBuiltModal } from "@/components/HowItWasBuiltModal";
-import { StartupPlan, AgentStage } from "@/types/startup";
-import { PRESET_IDEAS } from "@/lib/ai/presets";
+import { StartupPlan, AgentStage, AgentStageId, PlanSource } from "@/types/startup";
+import { PRESET_IDEAS, generateDynamicPlan } from "@/lib/ai/presets";
 
 const INITIAL_STAGES: AgentStage[] = [
   {
@@ -55,13 +55,19 @@ export default function Home() {
   const [isHowItWasBuiltOpen, setIsHowItWasBuiltOpen] = useState(false);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const elapsedSecondsRef = useRef(0);
 
   // Timer runner during active generation
   useEffect(() => {
     if (appState === "running") {
       setElapsedSeconds(0);
+      elapsedSecondsRef.current = 0;
       timerRef.current = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
+        setElapsedSeconds((prev) => {
+          const nextVal = prev + 1;
+          elapsedSecondsRef.current = nextVal;
+          return nextVal;
+        });
       }, 1000);
     } else {
       if (timerRef.current) {
@@ -79,88 +85,153 @@ export default function Home() {
     setAppState("running");
     setActiveStageIndex(0);
 
-    // Reset stages
+    const startTime = Date.now();
+
+    // Reset stages to initial queued state with first stage running
     const freshStages: AgentStage[] = INITIAL_STAGES.map((s, idx) => ({
       ...s,
       status: idx === 0 ? "running" : "queued",
     }));
     setStages(freshStages);
 
-    try {
-      // Initiate background API call
-      const fetchPromise = fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idea: userIdea, presetId }),
-      }).then(async (res) => {
-        if (!res.ok) {
-          throw new Error("Generation request failed");
+    // Fast-path for presets if requested directly
+    if (presetId) {
+      try {
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idea: userIdea, presetId }),
+        });
+        const data = await res.json();
+
+        // Stagger visual completion across the 4 stages for UI feedback
+        for (let i = 0; i < 4; i++) {
+          setActiveStageIndex(i);
+          setStages((prev) =>
+            prev.map((s, idx) =>
+              idx === i ? { ...s, status: "running" } : idx < i ? { ...s, status: "done" } : s
+            )
+          );
+          await new Promise((r) => setTimeout(r, 350));
+          setStages((prev) =>
+            prev.map((s, idx) => (idx <= i ? { ...s, status: "done" } : s))
+          );
         }
-        return res.json();
-      });
 
-      // Provide realistic multi-agent progress pacing so judges see each agent working
-      // Stage 1: Research
-      await new Promise((r) => setTimeout(r, 2200));
+        setActiveStageIndex(4);
+        const presetPlan: StartupPlan = {
+          ...(data.plan || PRESET_IDEAS.find((p) => p.id === presetId)?.plan),
+          source: "preset",
+        };
+        setPlan(presetPlan);
+
+        // Celebratory confetti
+        try {
+          confetti({
+            particleCount: 50,
+            spread: 60,
+            origin: { y: 0.7 },
+            colors: ["#0070f3", "#38bdf8", "#10b981", "#ffffff"],
+          });
+        } catch (_) {}
+
+        setTimeout(() => {
+          setAppState("completed");
+        }, 1000);
+        return;
+      } catch (presetErr) {
+        console.warn("Preset fetch error, falling back to local preset data:", presetErr);
+        const localPreset = PRESET_IDEAS.find((p) => p.id === presetId) || PRESET_IDEAS[0];
+        setPlan({ ...localPreset.plan, source: "preset" });
+        setStages((prev) => prev.map((s) => ({ ...s, status: "done" })));
+        setAppState("completed");
+        return;
+      }
+    }
+
+    // Real per-stage sequential multi-agent execution (FIX 1)
+    const stageIds: AgentStageId[] = ["research", "strategy", "copywriter", "spec"];
+    const accumulatedData: Record<string, any> = {};
+    let overallSource: PlanSource = "live";
+
+    for (let i = 0; i < stageIds.length; i++) {
+      const stageId = stageIds[i];
+
+      // Update UI: Current stage running, previous stages done
+      setActiveStageIndex(i);
       setStages((prev) =>
-        prev.map((s, i) =>
-          i === 0 ? { ...s, status: "done" } : i === 1 ? { ...s, status: "running" } : s
+        prev.map((s, idx) =>
+          idx === i ? { ...s, status: "running" } : idx < i ? { ...s, status: "done" } : s
         )
       );
-      setActiveStageIndex(1);
 
-      // Stage 2: Strategy
-      await new Promise((r) => setTimeout(r, 2400));
-      setStages((prev) =>
-        prev.map((s, i) =>
-          i === 1 ? { ...s, status: "done" } : i === 2 ? { ...s, status: "running" } : s
-        )
-      );
-      setActiveStageIndex(2);
+      try {
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            idea: userIdea,
+            stage: stageId,
+            previousData: accumulatedData,
+          }),
+        });
 
-      // Stage 3: Copywriter
-      await new Promise((r) => setTimeout(r, 2400));
-      setStages((prev) =>
-        prev.map((s, i) =>
-          i === 2 ? { ...s, status: "done" } : i === 3 ? { ...s, status: "running" } : s
-        )
-      );
-      setActiveStageIndex(3);
+        if (!response.ok) {
+          throw new Error(`Stage ${stageId} returned status ${response.status}`);
+        }
 
-      // Await data from API
-      const result = await fetchPromise;
-
-      // Stage 4: Spec
-      await new Promise((r) => setTimeout(r, 1800));
-      setStages((prev) => prev.map((s) => ({ ...s, status: "done" })));
-      setActiveStageIndex(4);
-
-      if (result.plan) {
-        setPlan(result.plan);
+        const result = await response.json();
+        if (result.source === "fallback") {
+          overallSource = "fallback";
+        }
+        accumulatedData[stageId] = result.data;
+      } catch (stageErr) {
+        console.warn(`Stage ${stageId} failed, recovering with dynamic plan data:`, stageErr);
+        overallSource = "fallback";
+        const dynFallback = generateDynamicPlan(userIdea);
+        accumulatedData[stageId] = (dynFallback as any)[stageId];
       }
 
-      // Celebratory Confetti on completion!
-      try {
-        confetti({
-          particleCount: 50,
-          spread: 60,
-          origin: { y: 0.7 },
-          colors: ["#0070f3", "#38bdf8", "#10b981", "#ffffff"],
-        });
-      } catch (_) {}
-
-      // Short delay to let judge see all green checkmarks, then reveal dashboard
-      setTimeout(() => {
-        setAppState("completed");
-      }, 1200);
-    } catch (err) {
-      console.error("Pipeline execution error:", err);
-      // Fallback to preset or dynamic plan if any unexpected error occurs
-      const fallbackPreset = PRESET_IDEAS[0];
-      setPlan(fallbackPreset.plan);
-      setStages((prev) => prev.map((s) => ({ ...s, status: "done" })));
-      setAppState("completed");
+      // Mark current stage done immediately when response is resolved
+      setStages((prev) =>
+        prev.map((s, idx) => (idx === i ? { ...s, status: "done" } : s))
+      );
     }
+
+    // All 4 stages resolved
+    setActiveStageIndex(4);
+    const finalDuration = Math.max(
+      1,
+      elapsedSecondsRef.current || Math.round((Date.now() - startTime) / 1000)
+    );
+
+    const fullPlan: StartupPlan = {
+      idea: userIdea,
+      createdAt: new Date().toISOString(),
+      durationSeconds: finalDuration,
+      source: overallSource,
+      research: accumulatedData.research,
+      strategy: accumulatedData.strategy,
+      copywriter: accumulatedData.copywriter,
+      spec: accumulatedData.spec,
+    };
+
+    setPlan(fullPlan);
+
+    // Celebratory confetti on completion
+    try {
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.7 },
+        colors: ["#0070f3", "#38bdf8", "#10b981", "#ffffff"],
+      });
+    } catch (_) {}
+
+    // Short delay before reveal so user sees all 4 green checkmarks
+    setTimeout(() => {
+      setAppState("completed");
+    }, 1000);
   };
 
   const handleReset = () => {
@@ -169,6 +240,7 @@ export default function Home() {
     setIdea("");
     setStages(INITIAL_STAGES);
     setElapsedSeconds(0);
+    elapsedSecondsRef.current = 0;
     setActiveStageIndex(0);
   };
 
@@ -184,10 +256,7 @@ export default function Home() {
       {/* State 1: Hero & Idea Input */}
       {appState === "idle" && (
         <main>
-          <IdeaInput
-            onGenerate={handleStartGeneration}
-            isLoading={false}
-          />
+          <IdeaInput onGenerate={handleStartGeneration} />
         </main>
       )}
 

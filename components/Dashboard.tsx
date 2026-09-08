@@ -70,7 +70,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ plan, onReset }) => {
               </h1>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
+              {/* FIX 3: Live AI vs Demo Mode indicator badge */}
+              <div className="rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 font-mono text-xs flex items-center gap-1.5">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    plan.source === "live"
+                      ? "bg-emerald-400 animate-pulse"
+                      : "bg-amber-400"
+                  }`}
+                />
+                <span
+                  className={
+                    plan.source === "live"
+                      ? "text-emerald-300 font-medium"
+                      : "text-amber-300 font-medium"
+                  }
+                >
+                  {plan.source === "live" ? "Live AI" : "Demo Mode"}
+                </span>
+              </div>
+
               <div className="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1.5 font-mono text-xs text-zinc-400 flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5 text-cyan-400" />
                 <span>Generated in {plan.durationSeconds}s</span>

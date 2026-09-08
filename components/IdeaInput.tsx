@@ -1,37 +1,37 @@
 "use client";
 
 import React, { useState } from "react";
-import { ArrowRight, Sparkles, Zap, Command, ShieldCheck, Flame } from "lucide-react";
-import { PRESET_IDEAS } from "@/lib/ai/presets";
+import { ArrowRight, Sparkles, Zap, ShieldCheck, Flame } from "lucide-react";
+import { PRESET_CHIPS } from "@/lib/ai/presets";
 
+// FIX 7: Removed dead isLoading prop
 interface IdeaInputProps {
   onGenerate: (idea: string, presetId?: string) => void;
-  isLoading: boolean;
 }
 
-export const IdeaInput: React.FC<IdeaInputProps> = ({ onGenerate, isLoading }) => {
+export const IdeaInput: React.FC<IdeaInputProps> = ({ onGenerate }) => {
   const [idea, setIdea] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!idea.trim() || isLoading) return;
+    if (!idea.trim()) return;
     onGenerate(idea);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       e.preventDefault();
-      if (idea.trim() && !isLoading) {
+      if (idea.trim()) {
         onGenerate(idea);
       }
     }
   };
 
   const handleSelectPreset = (presetId: string) => {
-    const preset = PRESET_IDEAS.find((p) => p.id === presetId);
+    const preset = PRESET_CHIPS.find((p) => p.id === presetId);
     if (preset) {
-      setIdea(preset.plan.idea);
-      onGenerate(preset.plan.idea, preset.id);
+      setIdea(preset.title);
+      onGenerate(preset.title, preset.id);
     }
   };
 
@@ -69,7 +69,6 @@ export const IdeaInput: React.FC<IdeaInputProps> = ({ onGenerate, isLoading }) =
             value={idea}
             onChange={(e) => setIdea(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isLoading}
             placeholder="e.g. AI meal planner for diabetics with real-time CGM glycemic response forecasting, plate vision, and insulin curve simulation..."
             className="w-full resize-none bg-transparent p-3 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none sm:text-base sm:p-4 min-h-[110px]"
             rows={3}
@@ -91,26 +90,17 @@ export const IdeaInput: React.FC<IdeaInputProps> = ({ onGenerate, isLoading }) =
             {/* Submit Button - Vercel Pure White Style */}
             <button
               type="submit"
-              disabled={!idea.trim() || isLoading}
+              disabled={!idea.trim()}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-black transition-all hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40 shadow-sm"
             >
-              {isLoading ? (
-                <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" />
-                  <span>Spawning Agents...</span>
-                </>
-              ) : (
-                <>
-                  <span>Generate Startup Plan</span>
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
+              <span>Generate Startup Plan</span>
+              <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </div>
       </form>
 
-      {/* Preset Idea Chips for Instant Judge Demos */}
+      {/* FIX 6: Preset Idea Chips using lightweight PRESET_CHIPS */}
       <div className="mt-8">
         <div className="flex items-center justify-between mb-3 px-1">
           <span className="text-xs font-mono uppercase tracking-widest text-zinc-500 flex items-center gap-1.5">
@@ -123,11 +113,10 @@ export const IdeaInput: React.FC<IdeaInputProps> = ({ onGenerate, isLoading }) =
         </div>
 
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-          {PRESET_IDEAS.map((preset) => (
+          {PRESET_CHIPS.map((preset) => (
             <button
               key={preset.id}
               onClick={() => handleSelectPreset(preset.id)}
-              disabled={isLoading}
               className="group flex flex-col justify-between rounded-lg border border-zinc-800/80 bg-zinc-900/40 p-3.5 text-left transition-all hover:border-zinc-700 hover:bg-zinc-900/80 hover:translate-y-[-1px]"
             >
               <div>
